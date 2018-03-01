@@ -85,5 +85,5 @@ vanillaFloat.start(elementsCollection);
 ``` 
 
 
-##CHANGELOG
+## CHANGELOG
 > 1.0.2 - Memory and speed optimization
