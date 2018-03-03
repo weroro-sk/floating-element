@@ -1,6 +1,9 @@
 class Floating {
 
-    constructor() {
+    constructor(floatingInResponsiveMode = false) {
+
+        /** @type {boolean} */
+        this.FIRM = floatingInResponsiveMode;
 
         /** @type {Object} */
         this.floatingBuffer = {};
@@ -72,7 +75,7 @@ class Floating {
     };
 
     /**
-     * @param {HTMLElement} element
+     * @param {HTMLElement|Node} element
      * @param {String} propertyName
      * @returns {Number|String}
      */
@@ -89,7 +92,7 @@ class Floating {
     }
 
     /**
-     * @param {HTMLElement} element
+     * @param {HTMLElement|Node} element
      * @param {Boolean} [withMargin]
      * @returns {{width: Number, height: Number}}
      */
@@ -235,6 +238,17 @@ class Floating {
     }
 
     /**
+     * @param {HTMLElement|Node} element
+     * @returns {{top: *, left: *}}
+     */
+    getOffset(element) {
+        const rect = element.getBoundingClientRect();
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        return {top: rect.top + scrollTop, left: rect.left + scrollLeft};
+    }
+
+    /**
      * @param {Number} scrollActual
      * @returns {void}
      */
@@ -254,22 +268,44 @@ class Floating {
                 const fixedSelector = buffer.fixedSelector;
                 /** @type {String} */
                 const absoluteSelector = buffer.absoluteSelector;
+
+                if (this.FIRM === false
+                    && this.getDimensions(wrapper).height > this.getDimensions(element.parentNode).height) {
+                    element.style.position = 'static';
+                    this.removeClass(element, fixedSelector)
+                        .removeClass(element, absoluteSelector);
+                    return;
+                }
+
                 /** @type {Number} */
-                const wrapperBorderWidth = this.getStyle(wrapper, 'borderBottom');
+                const wrapperOffsetTop = this.getOffset(wrapper).top;
                 /** @type {Number} */
-                const wrapperPaddingBottom = this.getStyle(wrapper, 'paddingBottom');
+                let wrapperBorderWidth = this.getStyle(wrapper, 'borderBottom');
+
+                /** @type {Number} */
+                let wrapperPaddingBottom = 0;
+                if (element.parentNode === wrapper) {
+                    wrapperPaddingBottom = this.getStyle(wrapper, 'paddingBottom');
+                }
+
                 /** @type {Number} */
                 const wrapperHeight = this.getDimensions(wrapper).height - (wrapperBorderWidth + wrapperPaddingBottom);
                 /** @type {Number} */
                 const elementHeight = this.getDimensions(element, true).height;
                 /** @type {Number} */
-                const elementBottom = wrapper.offsetTop + wrapperHeight - (buffer.offsetBottom + elementHeight);
+                const elementBottom = wrapperOffsetTop + wrapperHeight - (buffer.offsetBottom + elementHeight);
 
                 if (this.empty(buffer['elementTop'])) {
-                    buffer['elementTop'] = element.offsetTop;
+                    buffer['elementTop'] = this.getOffset(element).top;
                 }
                 /** @type {Number|undefined} */
-                const defaultTop = buffer['elementTop'];
+                const defaultTop = this.numericVal(buffer['elementTop']);
+
+                if (buffer.hasOwnProperty('positionOrigin') && this.empty(buffer['positionOrigin'])) {
+                    buffer['positionOrigin'] = {};
+                    buffer['positionOrigin']['position'] = this.getStyle(element, 'position');
+                    buffer['positionOrigin']['top'] = this.getStyle(element, 'top');
+                }
 
                 if (scrollActual >= defaultTop - offsetTop && scrollActual < elementBottom - offsetTop) {
                     if (buffer.disableInlineStyles !== true) {
@@ -282,8 +318,12 @@ class Floating {
                     }
                 } else if (scrollActual >= elementBottom - offsetTop) {
                     if (buffer.disableInlineStyles !== true) {
+                        let elementTop = elementBottom;
+                        if (this.getStyle(element.parentNode, 'position').toLowerCase() === 'relative') {
+                            elementTop -= wrapperOffsetTop;
+                        }
                         element.style.position = 'absolute';
-                        element.style.top = `${elementBottom}px`;
+                        element.style.top = `${elementTop}px`;
                     }
                     if (buffer.disableClasses !== true) {
                         this.addClass(element, absoluteSelector)
@@ -291,8 +331,12 @@ class Floating {
                     }
                 } else {
                     if (buffer.disableInlineStyles !== true) {
-                        element.style.position = 'relative';
-                        element.style.top = '0';
+                        if (this.empty(buffer['positionOrigin'])) {
+                            element.style.position = 'static';
+                        } else {
+                            element.style.position = buffer['positionOrigin']['position'];
+                            element.style.top = this.numericVal(buffer['positionOrigin']['top']) + 'px';
+                        }
                     }
                     if (buffer.disableClasses !== true) {
                         this.removeClass(element, fixedSelector)
@@ -300,8 +344,17 @@ class Floating {
                     }
                     delete buffer['elementTop'];
                 }
+
             }
         }
+    }
+
+    /**
+     * @returns {Number}
+     */
+    scrollPosition() {
+        const doc = document.documentElement;
+        return (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0);
     }
 
     /**
@@ -309,9 +362,7 @@ class Floating {
      */
     scrollEvent() {
         window.addEventListener('scroll', () => {
-            const doc = document.documentElement;
-            const scrollTop = (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0);
-            this.elementPosition(scrollTop);
+            this.elementPosition(this.scrollPosition());
         });
         return this;
     }
@@ -363,30 +414,32 @@ class Floating {
      * @returns {Floating}
      */
     start(element = null, options = {}) {
-        if (!!element !== true) {
-            element = this.getPreviousElement();
-        }
-        if (this.isHtmlElement(element)) {
-            this.createElementIndex(element, options);
-        } else if (element !== null) {
-            /** @type {String|HTMLElement|NodeList} */
-            let mainElement = element;
-            if (typeof element === 'string') {
-                mainElement = document.querySelectorAll(element);
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!!element !== true) {
+                element = this.getPreviousElement();
             }
-            if (!!mainElement !== true || !mainElement.length) {
-                console.trace('Element not found!');
-                return this;
-            }
-            for (let element of mainElement) {
+            if (this.isHtmlElement(element)) {
                 this.createElementIndex(element, options);
+            } else if (element !== null) {
+                /** @type {String|HTMLElement|NodeList} */
+                let mainElement = element;
+                if (typeof element === 'string') {
+                    mainElement = document.querySelectorAll(element);
+                }
+                if (!!mainElement !== true || !mainElement.length) {
+                    console.trace('Element not found!');
+                    return;
+                }
+                for (let element of mainElement) {
+                    this.createElementIndex(element, options);
+                }
+            } else {
+                console.trace('Element not found!');
+                return;
             }
-        } else {
-            console.trace('Element not found!');
-            return this;
-        }
-        this.elementPosition(document.documentElement.scrollTop);
-        this.scrollEvent();
+            this.elementPosition(this.scrollPosition());
+            this.scrollEvent();
+        });
         return this;
     }
 }

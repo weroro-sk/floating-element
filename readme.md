@@ -86,4 +86,10 @@ vanillaFloat.start(elementsCollection);
 
 
 ## CHANGELOG
-> 1.0.2 - Memory and speed optimization
+> 1.0.2 - Memory and speed optimization.
+
+> 1.1.3 
+> * Fix positioning bug while parent element has position relative.
+> * Implementing interrupter for responsive modes.
+> * Implementing document ready.
+> * Floated element style position origin memory.
