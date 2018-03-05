@@ -21,7 +21,9 @@ vanillaFloat.start(@selector, @options);
                     fixedSelector: string, 
                     absoluteSelector: string, 
                     disableInlineStyles: boolean, 
-                    disableClasses: boolean
+                    disableClasses: boolean,
+                    minWidth: number,
+                    maxWidth: number
                 }
 */
 ```
@@ -86,10 +88,14 @@ vanillaFloat.start(elementsCollection);
 
 
 ## CHANGELOG
-> 1.0.2 - Memory and speed optimization.
+> 1.0.2 
+> * Memory and speed optimization.
 
 > 1.1.3 
 > * Fix positioning bug while parent element has position relative.
 > * Implementing interrupter for responsive modes.
 > * Implementing document ready.
 > * Floated element style position origin memory.
+
+> 1.2.0 
+> * minWidth & maxWidth window detection

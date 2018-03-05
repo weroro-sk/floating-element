@@ -5,18 +5,32 @@ class Floating {
         /** @type {boolean} */
         this.FIRM = floatingInResponsiveMode;
 
-        /** @type {Object} */
-        this.floatingBuffer = {};
-
         /**
-         * @type {{
-                     wrapper: string|HTMLElement,
+         * @type {Object|{string: {
+                     wrapper: HTMLElement,
+                     mainElement: HTMLElement,
                      offsetBottom: number,
                      offsetTop: number,
                      fixedSelector: string,
                      absoluteSelector: string,
                      disableInlineStyles: boolean,
-                     disableClasses: boolean
+                     disableClasses: boolean,
+                     minWidth: number,
+                     maxWidth: number
+                 }}}
+         */
+        this.floatingBuffer = {};
+
+        /**
+         * @type {{
+                     offsetBottom: number,
+                     offsetTop: number,
+                     fixedSelector: string,
+                     absoluteSelector: string,
+                     disableInlineStyles: boolean,
+                     disableClasses: boolean,
+                     minWidth: number,
+                     maxWidth: number
                  }}
          */
         this.defaultProperties = {
@@ -25,7 +39,9 @@ class Floating {
             'fixedSelector': 'floating-fixed',
             'absoluteSelector': 'floating-absolute',
             'disableInlineStyles': false,
-            'disableClasses': false
+            'disableClasses': false,
+            'minWidth': 0,
+            'maxWidth': Infinity
         };
 
     }
@@ -114,6 +130,46 @@ class Floating {
     }
 
     /**
+     * @param {HTMLElement|Node} element
+     * @returns {{top: Number, left: Number}}
+     */
+    getOffset(element) {
+        const rect = element.getBoundingClientRect();
+        const scrollLeft = this.numericVal(window.pageXOffset || document.documentElement.scrollLeft);
+        const scrollTop = this.numericVal(window.pageYOffset || document.documentElement.scrollTop);
+        return {top: this.numericVal(rect.top) + scrollTop, left: this.numericVal(rect.left) + scrollLeft};
+    }
+
+    /**
+     * @returns {{width: Number, height: Number}}
+     */
+    pageDimensions() {
+        /** @type {Window} */
+        const w = window;
+        /** @type {Document} */
+        const d = document;
+        /** @type {Element} */
+        const e = d.documentElement;
+        /** @type {HTMLElement} */
+        const g = d.body;
+        /** @type {Number} */
+        const x = w.innerWidth || e.clientWidth || g.clientWidth;
+        /** @type {Number} */
+        const y = w.innerHeight || e.clientHeight || g.clientHeight;
+        return {width: this.numericVal(x), height: this.numericVal(y)};
+    }
+
+    /**
+     * @param {Object} buffer
+     * @returns {Boolean}
+     */
+    checkDimensions(buffer) {
+        /** @type {{width: Number, height: Number}} */
+        const winDim = this.pageDimensions();
+        return (winDim.width >= buffer.minWidth && winDim.width <= buffer.maxWidth);
+    }
+
+    /**
      * @param {String} inputString
      * @param {Boolean} [removeAllSpaces]
      * @returns {String}
@@ -193,7 +249,7 @@ class Floating {
         /** @type {String} */
         let outputString = `${idPrefix}${randomNumber}`;
         if (this.floatingBuffer.hasOwnProperty(outputString)) {
-            outputString = this.floatingIDGenerator();
+            outputString = this.floatingIDGenerator(idPrefix);
         }
         return outputString;
     }
@@ -238,17 +294,6 @@ class Floating {
     }
 
     /**
-     * @param {HTMLElement|Node} element
-     * @returns {{top: *, left: *}}
-     */
-    getOffset(element) {
-        const rect = element.getBoundingClientRect();
-        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        return {top: rect.top + scrollTop, left: rect.left + scrollLeft};
-    }
-
-    /**
      * @param {Number} scrollActual
      * @returns {void}
      */
@@ -259,6 +304,11 @@ class Floating {
                 /** @type {Object} */
                 const buffer = this.floatingBuffer[bufferKeyName];
                 /** @type {HTMLElement} */
+
+                if (this.checkDimensions(buffer) === false) {
+                    return;
+                }
+
                 const element = buffer.mainElement;
                 /** @type {HTMLElement} */
                 const wrapper = buffer.wrapper;
@@ -371,7 +421,7 @@ class Floating {
      * @returns {HTMLElement}
      */
     getCurrentScriptElement() {
-        /** @var {{currentScript}} document */
+        /** @var {Document|{currentScript}} document */
         return document.currentScript || (() => {
             /** @type {NodeList} */
             const scripts = document.querySelectorAll('script');
